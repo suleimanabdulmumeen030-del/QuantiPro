@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QuantiPro: Takeoff, BOQ, Material and Labour Schedules</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body{font-family:'IBM Plex Sans',sans-serif;font-variant-numeric:tabular-nums;background:#f3f5f7;color:#14213d}
+  .sheet{background:#fff;border:1px solid #cfd6de;border-left:4px double #e8590c;overflow-x:auto}
+  td,th{padding:.45rem .6rem;border-bottom:1px solid #e3e8ee;white-space:nowrap}
+  th{text-align:left;background:#eef1f5;font-weight:600}
+  td.n,th.n{text-align:right}
+  td.g{background:#fff4ec;font-weight:600;color:#b4400a}
+  input,textarea{border:1px solid #b8c1cc;border-radius:4px;padding:.3rem .5rem;width:100%;background:#fff}
+  td input{width:6.5rem;text-align:right}
+  :focus-visible{outline:2px solid #e8590c;outline-offset:1px}
+  .tab{padding:.5rem .9rem;border:1px solid #cfd6de;background:#fff;font-weight:500}
+  .tab[aria-selected=true]{background:#14213d;color:#fff;border-color:#14213d}
+  .go{background:#e8590c;color:#fff;font-weight:600;padding:.6rem 1.2rem;border-radius:4px}
+  @media print{.np{display:none}body{background:#fff}.ph{display:flex}}
+  input[type=checkbox]{width:auto;margin-top:.2rem}
+  .go{display:inline-block}.wa{background:#128c4a}
+  .card{background:#fff;border:1px solid #cfd6de;border-top:3px solid #e8590c;padding:1rem}
+  .ph{display:none;align-items:center;gap:1rem;border-bottom:2px solid #14213d;padding-bottom:.6rem;margin-bottom:1rem}
+  nav#nav a{padding:.5rem .7rem;white-space:nowrap;border-bottom:3px solid transparent}
+  nav#nav a[aria-current=page]{border-color:#e8590c;font-weight:600}
+  details.card summary{font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+<header class="np sticky top-0 z-10 bg-white border-b border-slate-300">
+  <div class="max-w-5xl mx-auto px-4 py-2 flex items-center gap-3">
+    <a href="#home" class="font-bold text-xl" data-site="name">QuantiPro</a>
+    <nav id="nav" class="flex overflow-x-auto text-sm flex-1" aria-label="Main"></nav>
+    <span id="acct" class="text-sm flex items-center gap-2 whitespace-nowrap"></span>
+    <a class="go wa hidden sm:inline-block" data-wa="Hello, I have a question.">WhatsApp</a>
+  </div>
+</header>
+
+<main data-page="takeoff" class="max-w-5xl mx-auto p-4 space-y-5" hidden>
+  <section class="np sheet p-4">
+    <p class="text-sm text-slate-600 mb-3">Fill in what you know. Anything left blank is estimated from your rooms and floor area, and flagged on the sheet.</p>
+    <fieldset class="mb-4 border border-slate-300 rounded p-3">
+      <legend class="font-semibold px-1">What do you want to calculate?</legend>
+      <div id="scope" class="grid sm:grid-cols-2 gap-2"></div>
+      <div class="mt-3 flex gap-2"><button id="scAll" class="tab">Select all</button><button id="scNone" class="tab">Clear all</button></div>
+    </fieldset>
+    <div class="grid sm:grid-cols-2 gap-3 mb-4">
+      <label class="text-sm font-medium">Project name<input id="proj" placeholder="e.g. Three-bedroom bungalow"></label>
+      <label class="text-sm font-medium">Foundation type
+        <select id="foundation" class="border border-slate-400 rounded p-2 w-full bg-white">
+          <option value="strip">Strip (continuous) footing</option><option value="pad">Pad (isolated) footings with ground beams</option>
+          <option value="raft">Raft foundation</option><option value="pile">Piled foundation with caps and ground beams</option>
+        </select></label>
+    </div>
+    <div id="form" class="space-y-4"></div>
+    <label data-sc="wall open fin" class="block mt-4 text-sm font-medium">Openings (width, height, quantity per line, in metres)
+      <textarea id="openings" rows="4">0.85,2.1,11
+0.75,1.8,8
+0.9,1.8,4
+0.6,0.6,3</textarea>
+    </label>
+    <div class="grid sm:grid-cols-2 gap-3 mt-4 text-sm">
+      <label data-sc="roof">Roof frame<select id="roofFrame" class="border border-slate-400 rounded p-2 w-full bg-white"><option value="timber">Timber trusses</option><option value="steel">Steel trusses</option></select></label>
+      <label data-sc="roof">Roof covering<select id="roofCover" class="border border-slate-400 rounded p-2 w-full bg-white"><option>Longspan aluminium sheets</option><option>Stone-coated steel sheets</option><option>Clay or concrete tiles</option></select></label>
+      <label data-sc="open">Door type<select id="doorType" class="border border-slate-400 rounded p-2 w-full bg-white"><option>Timber flush</option><option>Timber panel</option><option>Steel</option><option>Aluminium glazed</option></select></label>
+      <label data-sc="open">Window type<select id="winType" class="border border-slate-400 rounded p-2 w-full bg-white"><option>Aluminium</option><option>Steel</option><option>Timber</option></select></label>
+    </div>
+    <label data-sc="fin serv" class="block mt-4 text-sm font-medium">Rooms: name, length, width, floor (T tile or S screed), wall tile height (0 for none), ceiling (Y or N)
+      <textarea id="rooms" rows="5" placeholder="Living room,5,4.5,T,0,Y&#10;Bathroom,2.4,1.8,T,1.5,Y&#10;Store,3,2.4,S,0,N"></textarea>
+    </label>
+    <button id="go" class="go mt-4">Calculate takeoff</button>
+    <p id="msg" class="text-sm text-red-700 mt-2" role="alert"></p>
+  </section>
+
+  <details class="np sheet p-4">
+    <summary class="font-semibold cursor-pointer">Your company details (shown on printed bills and CSV files)</summary>
+    <div class="mt-3 grid sm:grid-cols-2 gap-3 text-sm">
+      <label>Company name<input id="coName"></label><label>Phone<input id="coPhone" type="tel"></label>
+      <label>Email<input id="coEmail" type="email"></label><label>Address<input id="coAddr"></label>
+      <label>Logo<input id="coLogo" type="file" accept="image/*"></label>
+      <div class="flex items-end"><button id="coClear" class="tab">Clear company details</button></div>
+    </div>
+    <div id="copv" class="mt-3 flex items-center gap-3 border-t pt-3"></div>
+  </details>
+  <details class="np sheet p-4">
+    <summary class="font-semibold cursor-pointer">Measure from a PDF drawing</summary>
+    <div class="mt-3 space-y-3 text-sm">
+      <input id="pdf" type="file" accept="application/pdf">
+      <div class="flex flex-wrap gap-2"><button class="tab" data-m="scale">1. Set scale</button><button class="tab" data-m="len">2. Measure length</button><button class="tab" data-m="area">3. Measure area</button><button class="tab" id="fin">Finish</button><button class="tab" id="undo">Undo point</button></div>
+      <p id="pmsg" class="text-slate-600">Open a drawing, set the scale by tapping two points a known distance apart, then trace walls or areas.</p>
+      <div class="overflow-auto border border-slate-300" style="max-height:60vh"><div style="position:relative;width:max-content"><canvas id="pcv"></canvas><canvas id="pov" style="position:absolute;left:0;top:0"></canvas></div></div>
+      <div id="pout"></div>
+    </div>
+  </details>
+  <div id="ph" class="ph"></div>
+  <nav id="tabs" class="np flex flex-wrap gap-1" role="tablist"></nav>
+  <section id="out" class="sheet"></section>
+  <button class="np tab" onclick="window.print()">Print or save as PDF</button> <button class="np tab" onclick="csv()">Download CSV for Excel</button>
+</main>
+
+<main data-page="home" class="max-w-5xl mx-auto p-4 space-y-12" hidden>
+  <section class="pt-8 grid md:grid-cols-2 gap-6 items-center">
+    <div>
+      <h1 class="text-3xl sm:text-5xl font-bold leading-tight">From drawing to Bill of Quantities in minutes, not days.</h1>
+      <p class="mt-4 text-lg text-slate-700">Do the takeoff, price the BOQ and schedule materials and labour for your building. Every figure shows its working, so you can check it the way a quantity surveyor would.</p>
+      <div class="mt-6 flex flex-wrap gap-3"><a href="#takeoff" class="go">Start a takeoff</a><a class="tab" data-wa="Hello, I would like to know more.">Ask us on WhatsApp</a></div>
+      <p class="mt-3 text-sm text-slate-600">Free account to start. Works on your phone.</p>
+    </div>
+    <div class="card" id="sample"></div>
+  </section>
+  <section id="stats" class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center"></section>
+  <section><h2 class="text-2xl font-bold mb-3">Everything a takeoff needs</h2><div id="feat" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"></div></section>
+  <section><h2 class="text-2xl font-bold mb-2">Measure only what you need</h2><p class="text-slate-700 mb-3">Tick the items of work you want, such as substructure only or roof only. The inputs, BOQ and schedules follow your choice.</p><div id="chips" class="flex flex-wrap gap-2"></div></section>
+  <section><h2 class="text-2xl font-bold mb-3">Who it is for</h2><div id="who" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3"></div></section>
+  <section><h2 class="text-2xl font-bold mb-3">How it works</h2><ol id="steps" class="grid sm:grid-cols-3 gap-3"></ol></section>
+  <section class="card text-center space-y-3"><h2 class="text-2xl font-bold">Ready to measure your next building?</h2><p class="text-slate-700">Create a free account and run your first takeoff today.</p><div class="flex flex-wrap gap-3 justify-center"><a href="#takeoff" class="go">Start a takeoff</a><a class="tab" href="#pricing">See pricing</a></div></section>
+</main>
+
+<main data-page="rates" class="max-w-5xl mx-auto p-4 space-y-4" hidden>
+  <h1 class="text-3xl font-bold">My rates</h1>
+  <p class="text-slate-700">Rates you enter in the BOQ and Materials tabs are saved here on this device and fill in automatically on every new project.</p>
+  <div class="sheet"><table class="w-full text-sm"><tr><th>Type</th><th>Item</th><th class="n">Rate (₦)</th><th></th></tr><tbody id="ratesBody"></tbody></table></div>
+</main>
+
+<main data-page="pricing" class="max-w-5xl mx-auto p-4 space-y-4" hidden>
+  <h1 class="text-3xl font-bold">Pricing</h1>
+  <p class="text-slate-700">Choose a plan and finish on WhatsApp. We confirm your access there.</p>
+  <div id="plans" class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
+</main>
+
+<main data-page="learn" class="max-w-3xl mx-auto p-4 space-y-4" hidden>
+  <h1 class="text-3xl font-bold">Learn</h1>
+  <p class="text-slate-700">Short notes for students and working quantity surveyors on how the figures in QuantiPro are built.</p>
+  <div id="learn" class="space-y-2"></div>
+</main>
+
+<main data-page="about" class="max-w-3xl mx-auto p-4 space-y-4" hidden>
+  <h1 class="text-3xl font-bold">About us</h1>
+  <p>QuantiPro was built to make takeoff and BOQ work faster and easier to check, for students learning measurement and for professionals working to a deadline.</p>
+  <p>We follow the way a quantity surveyor works. Dimensions go in once, quantities come out with their workings, and nothing is hidden behind a total. You can change any figure and see the effect straight away.</p>
+  <p>QuantiPro is a tool for your judgement, not a replacement for it. Always check quantities against your drawings and your adopted method of measurement before you price or submit.</p>
+  <div class="flex flex-wrap gap-3"><a href="#takeoff" class="go">Try the takeoff</a><a class="tab" data-wa="Hello, I would like to learn more about your company.">Chat with us</a></div>
+</main>
+
+<main data-page="faq" class="max-w-3xl mx-auto p-4 space-y-4" hidden>
+  <h1 class="text-3xl font-bold">Frequently asked questions</h1>
+  <div id="faq" class="space-y-2"></div>
+</main>
+
+<main data-page="contact" class="max-w-5xl mx-auto p-4 space-y-4" hidden>
+  <h1 class="text-3xl font-bold">Contact us</h1>
+  <p class="text-slate-700">Every message reaches us on WhatsApp, so you get a quick reply.</p>
+  <div class="grid md:grid-cols-2 gap-4">
+    <div class="card space-y-3">
+      <a class="go wa" data-wa="Hello, I have a question.">Chat on WhatsApp</a>
+      <p class="text-sm"><b>Phone</b> <span data-site="phone"></span><br><b>Email</b> <span data-site="email"></span><br><b>Address</b> <span data-site="address"></span><br><b>Hours</b> <span data-site="hours"></span></p>
+    </div>
+    <div class="card space-y-3 text-sm">
+      <label class="block">Your name<input id="cName"></label>
+      <label class="block">Topic<select id="cTopic" class="border border-slate-400 rounded p-2 w-full bg-white"><option>Pricing and plans</option><option>Help using QuantiPro</option><option>Training for a school or team</option><option>Something else</option></select></label>
+      <label class="block">Message<textarea id="cMsg" rows="4"></textarea></label>
+      <button id="cSend" class="go wa">Send on WhatsApp</button>
+    </div>
+  </div>
+</main>
+
+<main data-page="legal" class="max-w-3xl mx-auto p-4 space-y-3 text-sm leading-relaxed" hidden>
+  <h1 class="text-3xl font-bold">Terms and privacy</h1>
+  <p class="text-slate-600">Last updated 17 November 2026. <span data-site="legalName"></span> (<span data-site="rc"></span>) runs <span data-site="name"></span>. Contact: <span data-site="email"></span> or WhatsApp <span data-site="phone"></span>.</p>
+
+  <h2 class="text-xl font-semibold pt-2">Terms of use</h2>
+  <p><b>1. Agreement.</b> By using this website you agree to these terms. If you do not agree, please do not use it.</p>
+  <p><b>2. What the service does.</b> The service calculates estimated quantities, schedules and costs from the dimensions, rates and assumptions you enter. Results are estimates, not professional advice. You must check every quantity and price against your drawings, specification, contract and adopted method of measurement before you rely on, price, tender or build from it. Where a professional quantity surveyor is required, that professional stays responsible for the work. QuantiPro is a software tool. It does not provide quantity surveying, engineering or legal services.</p>
+  <p><b>3. No warranty.</b> The service is provided as it is. We do not promise that it is error-free, always available or suitable for your particular project. Built-in constants, mixes, wastage and labour rates are general defaults that you can and should adjust.</p>
+  <p><b>4. Acceptable use.</b> Do not copy, scrape, resell, sublicense or reverse engineer the service, share paid access beyond the person or named team who bought it, use it unlawfully, or try to disrupt or gain unauthorised access to it.</p>
+  <p><b>5. Your content.</b> Your project entries, rates, logo and company details belong to you. You allow us to process them only to provide the service. You confirm that you have the right to use any drawing or logo you load. PDF drawings are opened inside your own browser and are not uploaded to us.</p>
+  <p><b>6. Our rights.</b> The website, its code, design, text and name belong to us or our licensors. These terms give you a right to use the service, not to own it. Printouts and files you create from your own data are yours to use.</p>
+  <p><b>7. Payments and refunds.</b> Plans and prices are shown in naira and are arranged and confirmed on WhatsApp. Our refund terms are stated to you when you subscribe. Nothing in these terms limits any right you have under applicable Nigerian consumer protection law.</p>
+  <p><b>8. Limits on our liability.</b> To the fullest extent the law allows, we are not liable for indirect or consequential loss, loss of profit, loss of a tender or contract, or loss arising from pricing, ordering or construction decisions made on the service's results. Our total liability to you for any claim is limited to the amount you paid us in the 12 months before the claim. Nothing here excludes liability that cannot lawfully be excluded.</p>
+  <p><b>9. Changes and ending access.</b> We may update the service and these terms. We will change the date above when we do. We may suspend access for a serious breach of these terms. You may stop using the service at any time.</p>
+  <p><b>10. Governing law.</b> These terms are governed by the laws of the Federal Republic of Nigeria, and the Nigerian courts have jurisdiction over any dispute, unless the law gives you a different right.</p>
+
+  <p><b>11. General.</b> If any part of these terms is found to be unenforceable, the rest still applies. These terms are the whole agreement between you and us about the service.</p>
+
+  <h2 class="text-xl font-semibold pt-2">Privacy notice</h2>
+  <p><b>Who is responsible.</b> <span data-site="legalName"></span> is the data controller for personal data collected through this website. Contact us at <span data-site="email"></span> or on WhatsApp for any privacy request.</p>
+  <p><b>What we collect.</b></p>
+  <ul class="list-disc pl-5 space-y-1">
+    <li>When you message us on WhatsApp: your name, phone number and the content of your messages.</li>
+    <li>Technical data that our server and hosting provider receive when you visit: IP address, browser type and request logs.</li>
+    <li>Project entries you send for calculation. Our server uses them to return the result and does not save them.</li>
+    <li>On your device only: project entries, rates, logo and company details, kept in your browser's local storage. We cannot see these.</li>
+    <li><b>Account details.</b> When you create an account, your email address and password are handled by our authentication provider, Supabase, so that you can log in. We keep your account until you ask us to delete it.</li>
+  </ul>
+  <p><b>Why we use it, and our lawful basis.</b> To respond to you and agree your plan (your request and our contract with you). To provide and secure the service and keep business records (our legitimate interests). To meet legal obligations. Where we rely on your consent, you may withdraw it at any time.</p>
+  <p><b>Who receives it.</b> WhatsApp (Meta) handles your messages to us under its own terms. Our hosting provider runs the server. Content delivery services that supply the page's fonts, styling and PDF library (such as Google Fonts, Tailwind and cdnjs) can see your IP address and browser details when your browser loads them. Some of these providers operate outside Nigeria. Where required, we rely on appropriate safeguards for those transfers. We do not sell personal data.</p>
+  <p><b>How long we keep it.</b> WhatsApp conversations are kept for as long as needed for support and our records, then deleted. Server logs are kept by the hosting provider for its standard period. Data on your device stays until you clear it.</p>
+  <p><b>Your rights.</b> You may ask to access, correct or delete your personal data, to restrict or object to its use, to receive a copy, and to withdraw consent. Contact us to exercise these rights. You may also complain to the Nigeria Data Protection Commission.</p>
+  <p><b>Security.</b> We use reasonable technical and organisational measures to protect personal data. No online service is completely secure, and we will notify you and the regulator of a breach where the law requires.</p>
+  <p><b>Cookies.</b> We do not use cookies, advertising or analytics trackers. Local storage on your device keeps your own entries and your login session. If we add payments or analytics later, we will update this notice and ask for consent where required.</p>
+  <p><b>Children.</b> The service is not directed at children under 18.</p>
+</main>
+
+<main data-page="login" class="max-w-md mx-auto p-4 space-y-4" hidden>
+  <h1 class="text-3xl font-bold" id="lgTitle">Log in</h1>
+  <p id="lgInfo" class="text-sm text-slate-700">Log in to use the takeoff, BOQ and schedules.</p>
+  <div class="card space-y-3 text-sm">
+    <label class="block">Email<input id="lgEmail" type="email" autocomplete="email"></label>
+    <label class="block">Password<input id="lgPass" type="password" autocomplete="current-password"></label>
+    <label class="block" id="lgNewWrap" hidden>New password<input id="lgNew" type="password" autocomplete="new-password"></label>
+    <button id="lgGo" class="go w-full">Log in</button>
+    <p id="lgMsg" role="alert"></p>
+    <p class="flex flex-wrap justify-between gap-2"><button id="lgSwap" class="underline">Create an account</button><button id="lgForgot" class="underline">Forgot password?</button></p>
+  </div>
+</main>
+
+<footer class="np border-t border-slate-300 bg-white mt-10"><div class="max-w-5xl mx-auto p-4 grid sm:grid-cols-3 gap-4 text-sm">
+  <div><b data-site="name"></b><p class="text-slate-600" data-site="tagline"></p></div>
+  <div><b>Contact</b><p><span data-site="phone"></span><br><span data-site="email"></span><br><span data-site="address"></span></p></div>
+  <div><b>Company</b><p><a href="#about">About us</a> · <a href="#pricing">Pricing</a> · <a href="#faq">FAQ</a> · <a href="#legal">Terms and privacy</a></p></div>
+</div>
+<p class="max-w-5xl mx-auto px-4 pb-4 text-xs text-slate-500">© <span id="yr"></span> <span data-site="legalName"></span> · <span data-site="rc"></span></p></footer>
+<a class="np go wa" data-wa="Hello, I have a question." style="position:fixed;right:1rem;bottom:1rem;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.3)">WhatsApp us</a>
+
+<script>
+const API = ''; // leave empty when the backend serves this page; otherwise your Render URL
+const NAIRA = '₦';
+// ---- Edit these to brand the website ----
+const SITE = { name: 'QuantiPro', tagline: 'Takeoff, BOQ, material and labour schedules for builders and quantity surveyors.',
+  whatsapp: '2348076998478', /* country code and number, no + or spaces */ phone: '+234 807 699 8478', legalName: 'Your registered business name', rc: 'RC or BN number', email: 'hello@yourdomain.com', address: 'Your city, Nigeria', hours: 'Mon to Sat, 8am to 6pm' };
+// Sample prices: replace with your own
+const PLANS = [
+  { n: 'Free trial', p: '₦0', per: '2 days', f: ['Full takeoff and BOQ', 'Print and CSV export', 'No card needed'], cta: 'Create free account', href: '#takeoff' },
+  { n: 'Student', p: '₦10,000', per: 'per year', f: ['Everything in the trial', 'Learn notes and workings', 'Student ID needed'], cta: 'Choose Student' },
+  { n: 'Professional', p: '₦25,000', per: 'per year', f: ['Unlimited takeoffs', 'Your logo on every printout', 'Saved rates and PDF measuring'], cta: 'Choose Professional' },
+  { n: 'Team or school', p: 'Talk to us', per: '', f: ['Several users', 'Training session', 'Custom rate library'], cta: 'Ask about Team' }
+];
+const FEATURES = [['Smart takeoff', 'Enter your measurements once. Quantities for every element appear with their workings.'],
+  ['Eleven-bill BOQ', 'Preliminaries to external works, numbered like a professional bill, with contingency, profit and VAT.'],
+  ['Material schedule', 'Cement in bags, sand and gravel in tonnes, blocks, steel, roofing and finishes, ready to order from.'],
+  ['Labour schedule', 'Man-days by activity from editable constants, priced at your daily rate.'],
+  ['Four foundation types', 'Strip, pad, raft or piled, each with its own excavation, concrete, steel and formwork.'],
+  ['Storeys, stairs and retaining walls', 'Suspended floors, staircases and retaining walls measured with the ground floor.'],
+  ['PDF drawing measurement', 'Set the scale on a drawing and trace walls and areas into your takeoff.'],
+  ['Your brand on every printout', 'Add your logo, company name and contacts to printed bills and CSV files.'],
+  ['Choose what to measure', 'Tick only the sections you need, such as substructure or roof. The inputs, BOQ and schedules follow your choice.'],
+  ['Saved rates', 'Your rates stay on your device and fill in automatically on your next project.']];
+const STEPS = [['Describe the building', 'Enter plan size, walls, columns, openings and rooms, or measure them from a PDF.'],
+  ['Check the takeoff', 'Review the quantities and workings, change anything, and recalculate.'],
+  ['Price and print', 'Add your rates, set contingency and VAT, then print or download for Excel.']];
+const FAQ = [['Is the takeoff accurate?', 'Quantities come from the dimensions you enter, using standard formulas, and each shows its working. Check them against your drawings and your adopted method of measurement before you price or submit.'],
+  ['Which foundation types are covered?', 'Strip, pad, raft and piled foundations. Combined and strap footings and basements are not covered yet.'],
+  ['Can I put my logo and contacts on printouts?', 'Yes. Open Takeoff, then Your company details, add your name, contacts and logo, and they appear at the top of printed bills and in CSV files.'],
+  ['Where are my rates and projects saved?', 'In your own browser on your device. Clearing browser data removes them, so download a CSV to keep a copy.'],
+  ['Can students use it?', 'Yes. Every figure shows its working and the Learn page explains the constants and methods. See the Student plan on the Pricing page.'],
+  ['How do I pay?', 'Pick a plan on the Pricing page and finish on WhatsApp. We confirm your access there.'],
+  ['Does it work on a phone?', 'Yes. The site is built for phones as well as laptops.'],
+  ['Does QuantiPro replace a quantity surveyor?', 'No. It speeds up measurement and arithmetic. Judgement, pricing and responsibility stay with you.']];
+const LEARN = [['How a bill of quantities is organised', '<p>QuantiPro uses eleven bills: Preliminaries, Substructure, Superstructure, Reinforcement, Formwork, Roofing and carpentry, Doors and windows, Finishes, Electrical installation, Plumbing and drainage, and External works. Items are numbered by bill, for example 2.03.</p>'],
+  ['Taking off: good habits', '<ul class="list-disc pl-5"><li>Write dimensions in the same order every time: length, width, height.</li><li>Measure each element once.</li><li>Deduct openings from walls and finishes.</li><li>Keep the working beside every quantity.</li><li>Cross-check totals, for example floor area against plan area.</li></ul>'],
+  ['Constants QuantiPro uses', '<ul class="list-disc pl-5"><li>Cement: 50 kg bag, about 28.8 bags per m³.</li><li>Dry volume factor: 1.54 for concrete, 1.33 for mortar.</li><li>Sharp sand 1.6 t/m³, gravel 1.5 t/m³.</li><li>Y12 bar 0.888 kg/m, Y10 bar 0.617 kg/m.</li><li>225 mm block: 450 × 225 mm face, about 9.9 per m².</li><li>A142 BRC mesh roll: 2.4 × 48 m, 115.2 m².</li></ul><p class="mt-2">Labour constants are editable in the Labour tab.</p>'],
+  ['Common mixes', '<p>1:3:6 for blinding, footings, pads and ground slabs. 1:2:4 for columns, beams, lintels, suspended slabs, rafts and piles. 1:6 cement and sand for blockwork mortar.</p>'],
+  ['Abbreviations', '<p>BOQ bill of quantities. DPC damp-proof course. DPM damp-proof membrane. LM linear metre. md man-day. BRC welded mesh reinforcement. Y12 and Y10 high-yield bars of 12 mm and 10 mm.</p>'],
+  ['Before you submit a BOQ', '<ul class="list-disc pl-5"><li>Every item sits in the right bill with the right unit.</li><li>Provisional sums are clearly marked.</li><li>Rates are current and include wastage where you intend.</li><li>Contingency and VAT are set as your client expects.</li></ul>']];
+const PAGES = [['home', 'Home'], ['takeoff', 'Takeoff'], ['rates', 'My rates'], ['pricing', 'Pricing'], ['learn', 'Learn'], ['about', 'About us'], ['faq', 'FAQ'], ['contact', 'Contact'], ['legal', 'Terms and privacy'], ['login', 'Log in']];
+const FIELDS = [
+  ['Building', [['planL','Plan length (m)',13.715],['planW','Plan width (m)',12.025],['wallLen','Total wall length (LM)',99.35],['wallH','Wall height above DPC (m)',3.3],['subCourses','Block courses to DPC',4],['slabT','Ground slab thickness (m)',0.1]]],
+  ['Foundation', [['trenchW','Trench width (m)',0.7],['trenchD','Trench depth (m)',0.9],['footT','Strip footing thickness (m)',0.23],['overlap','Footing and base overlap deduction (m³)',2.32],['cols','Number of columns',12],['baseSize','Column base size (m)',1.2],['baseT','Column base thickness (m)',0.23],['baseExcD','Base excavation depth (m)',0.23],['fillH','Backfill height to DPC (m)',0.45],['rockV','Extra-over rock excavation (m³, 0 if none)',0],['ringBeam','Ring beam size (m, 0 for none)',0]]],
+  ['Columns and lintels', [['colSize','Column size (m)',0.225],['shortColH','Short column height (m)',0.9],['colExtH','Column extension height (m)',3.5],['lintels','Number of lintels',26],['lintelLen','Lintel length (m)',1.5],['lintelSize','Lintel size (m)',0.225],['p150','Length of 150 mm walls (m, within total)',0],['p100','Length of 100 mm walls (m, within total)',0]]],
+  ['Roof', [['pitch','Roof pitch (degrees)',20],['overhang','Eaves overhang (m)',0.6],['trussSp','Truss spacing (m)',1.2],['downpipes','Downpipes (no.)',4]]],
+  ['Doors, services and drainage (leave blank to estimate)', [['extDoors','External doors (no.)',2],['lights','Light points','' ],['sockets','Socket outlets',''],['switches','Switches',''],['acPts','Air-conditioner points',''],['wc','WC suites',''],['whb','Wash hand basins',''],['showers','Showers',''],['sinks','Kitchen sinks',''],['septic','Septic tanks and soakaways (no.)',1],['manholes','Manholes (no.)',2],['drainM','Drain pipe, 110 mm (m)',20]]],
+  ['Pad footings', [['padDepth','Pad excavation depth (m)',1.2]], 'pad'],
+  ['Ground beams', [['gW','Ground beam width (m)',0.225],['gD','Ground beam depth (m)',0.45]], 'pad pile'],
+  ['Raft foundation', [['raftT','Raft thickness (m)',0.3],['raftProj','Projection beyond walls (m)',0.3],['raftDepth','Excavation depth (m)',0.5]], 'raft'],
+  ['Piled foundation', [['pileN','Number of piles',24],['pileD','Pile diameter (m)',0.45],['pileL','Pile length (m)',8],['capW','Pile cap size (m)',0.9],['capT','Pile cap thickness (m)',0.6]], 'pile'],
+  ['Upper floors, staircase and retaining wall', [['floors','Number of floors (1 = bungalow)',1],['floorH','Storey height (m)',3.3],['upSlabT','Suspended slab thickness (m)',0.15],['stairs','Staircases (blank = 1 for a storey building)',''],['stairW','Stair width (m)',1],['rwLen','Retaining wall length (m)',0],['rwH','Retaining wall height (m)',1.5],['rwT','Retaining wall thickness (m)',0.225],['rwFootW','Retaining wall footing width (m)',1]]]
+];
+const TABS = ['Takeoff','BOQ','Materials','Labour'];
+let data = null, tab = 'Takeoff', saved = {};
+try { saved = JSON.parse(localStorage.getItem('quantipro') || '{}'); } catch (e) {}
+const keep = () => { try { localStorage.setItem('quantipro', JSON.stringify(saved)); } catch (e) {} };
+const $ = (id) => document.getElementById(id);
+const f2 = (x) => (+x).toLocaleString('en-NG', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+const num = (v) => (parseFloat(v) || 0);
+
+$('rooms').value = saved.rooms ?? '';
+const SECS = [['prelim', 'Preliminaries'], ['sub', 'Substructure works: clearance, excavation, foundations, hardcore, DPM, ground slab'], ['frame', 'Superstructure frame: columns, beams, upper floors, staircase'],
+  ['wall', 'Masonry and walling: blockwork, lintels, tie beams'], ['roof', 'Roof works: trusses, covering, gutters'], ['fin', 'Finishes: plaster, screed, tiles, ceilings, paint'],
+  ['open', 'Doors and windows'], ['serv', 'Services: electrical, plumbing, drainage'], ['ext', 'External works and retaining walls']];
+const EXTRAS = [['dewater', 'Add dewatering (pumping out excavations)'], ['planking', 'Add planking and strutting to excavation sides']];
+const SC = { 'Foundation': 'sub', 'Columns and lintels': 'frame wall sub', 'Roof': 'roof', 'Doors, services and drainage (leave blank to estimate)': 'open serv fin', 'Pad footings': 'sub', 'Ground beams': 'sub', 'Raft foundation': 'sub', 'Piled foundation': 'sub', 'Upper floors, staircase and retaining wall': 'frame ext' };
+const scope = Object.assign({ dewater: false, planking: false }, saved.scope || {});
+function drawScope() {
+  $('scope').innerHTML = SECS.map(([k, l]) => `<label class="flex gap-2 items-start text-sm"><input type="checkbox" data-scope="${k}" ${scope[k] !== false ? 'checked' : ''}><span>${l}</span></label>`).join('') +
+    EXTRAS.map(([k, l]) => `<label class="flex gap-2 items-start text-sm"><input type="checkbox" data-scope="${k}" ${scope[k] === true ? 'checked' : ''}><span>${l}</span></label>`).join('');
+}
+const setScope = (on) => { SECS.forEach(([k]) => { scope[k] = on; }); saved.scope = scope; keep(); drawScope(); ftShow(); };
+$('scope').onchange = (e) => { const k = e.target.dataset.scope; if (k) { scope[k] = e.target.checked; saved.scope = scope; keep(); ftShow(); } };
+$('scAll').onclick = () => setScope(true); $('scNone').onclick = () => setScope(false);
+drawScope();
+$('form').innerHTML = FIELDS.map(([t, fs, ft]) =>
+  `<fieldset data-ft="${ft || ''}" data-sc="${SC[t] || ''}"><legend class="font-semibold mb-2">${t}</legend><div class="grid grid-cols-1 sm:grid-cols-3 gap-3">` +
+  fs.map(([k, l, d]) => `<label class="text-sm">${l}<input id="${k}" type="number" step="any" value="${saved['f_' + k] ?? d}"></label>`).join('') +
+  `</div></fieldset>`).join('');
+
+const SEL = ['roofFrame', 'roofCover', 'doorType', 'winType']; SEL.forEach(k => { if (saved['f_' + k]) $(k).value = saved['f_' + k]; });
+$('foundation').value = saved.foundation || 'strip'; $('proj').value = saved.proj || '';
+const ftShow = () => document.querySelectorAll('[data-ft],[data-sc]').forEach(f => { const bad = f.dataset.ft && !f.dataset.ft.split(' ').includes($('foundation').value), off = f.dataset.sc && !f.dataset.sc.split(' ').some(k => scope[k] !== false); f.hidden = !!(bad || off); });
+$('foundation').onchange = () => { saved.foundation = $('foundation').value; keep(); ftShow(); };
+$('proj').oninput = () => { saved.proj = $('proj').value; keep(); };
+ftShow();
+$('tabs').innerHTML = TABS.map(t => `<button class="tab" role="tab" data-t="${t}">${t}</button>`).join('');
+$('tabs').onclick = (e) => { if (e.target.dataset.t) { tab = e.target.dataset.t; render(); } };
+
+$('go').onclick = async () => {
+  const body = { openings: $('openings').value.split('\n').map(l => l.split(',').map(num)).filter(a => a.length >= 3).map(([w, h, q]) => ({ w, h, q })) };
+  body.rooms = $('rooms').value.split('\n').map(l => l.split(',').map(s => s.trim())).filter(a => a.length >= 3).map(([n, l, w, f, t, c]) => ({ n, l: num(l), w: num(w), f, t: num(t), c }));
+  saved.rooms = $('rooms').value; body.foundation = $('foundation').value; saved.foundation = body.foundation; body.scope = scope; SEL.forEach(k => { body[k] = $(k).value; saved['f_' + k] = body[k]; });
+  FIELDS.forEach(([, fs]) => fs.forEach(([k]) => { body[k] = $(k).value; saved['f_' + k] = $(k).value; }));
+  keep(); $('msg').textContent = '';
+  try {
+    const tk = AUTH.auth ? await token() : null;
+    if (AUTH.auth && !tk) { sessionStorage.setItem('qp_next', 'takeoff'); location.hash = '#login'; return; }
+    const r = await fetch(API + '/api/takeoff', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(tk ? { Authorization: 'Bearer ' + tk } : {}) }, body: JSON.stringify(body) });
+    if (r.status === 401) { setSess(null); sessionStorage.setItem('qp_next', 'takeoff'); location.hash = '#login'; return; }
+    if (!r.ok) throw new Error();
+    data = await r.json(); tab = 'Takeoff'; render();
+    if (!data.items.length) $('msg').textContent = 'Nothing is selected. Tick at least one section of work above.';
+  } catch (e) { $('msg').textContent = 'Could not reach the QuantiPro backend. Check that the server is running and the API address at the top of the script is correct.'; }
+};
+
+const blk = (x) => x.blocks ? `<br><span class="text-xs text-slate-600">${x.blocks.toLocaleString('en-NG')} blocks (5% waste)</span>` : '';
+const row = (cells, cls = []) => '<tr>' + cells.map((c, i) => `<td class="${cls[i] || ''}">${c}</td>`).join('') + '</tr>';
+const head = (cols) => '<tr>' + cols.map(c => `<th class="${/^(Qty|Rate|Amount|Price|Man|Cost|Hours|md)/.test(c) ? 'n' : ''}">${c}</th>`).join('') + '</tr>';
+const rin = (k, ph) => `<input data-k="${k}" inputmode="decimal" placeholder="${ph}" value="${saved[k] ?? ''}" aria-label="${k}">`;
+const grouped = (cols) => { let g = '', out = ''; data.items.forEach((x, i) => { if (x.g !== g) { g = x.g; out += `<tr><td class="g" colspan="${cols}">${g}</td></tr>`; } out += '\u0000' + i + '\u0000'; }); return out; };
+
+function render() {
+  document.querySelectorAll('.tab[role=tab]').forEach(b => b.setAttribute('aria-selected', b.dataset.t === tab));
+  if (!data) { $('out').innerHTML = '<p class="p-4 text-slate-600">Enter your measurements above and choose Calculate takeoff.</p>'; return; }
+  const nt = (data.notes || []).map(n => `<p class="p-3 text-sm bg-amber-50 border-b border-amber-200">${n}</p>`).join('');
+  const nums = {}, cnt = {};
+  data.items.forEach((x, i) => { const b = (/\d+/.exec(x.g) || [0])[0]; cnt[b] = (cnt[b] || 0) + 1; nums[i] = b + '.' + String(cnt[b]).padStart(2, '0'); });
+  let h = '<table class="w-full text-sm">';
+  if (tab === 'Takeoff') {
+    h += head(['Description', 'Working', 'Qty', 'Unit']) + grouped(4).replace(/\u0000(\d+)\u0000/g, (_, i) => { const x = data.items[i]; return row([x.d + blk(x), x.w, f2(x.q), x.u], ['', '', 'n']); });
+  } else if (tab === 'BOQ') {
+    h += head(['Item', 'Description', 'Unit', 'Qty', 'Rate (' + NAIRA + ')', 'Amount (' + NAIRA + ')']) + grouped(6).replace(/\u0000(\d+)\u0000/g, (_, i) => { const x = data.items[i]; return row([nums[i], x.d + blk(x), x.u, f2(x.q), rin(K('r', x.d), '0'), `<span id="a${i}">0.00</span>`], ['', '', '', 'n', 'n', 'n']); });
+    const pc = (k, d) => `<input data-k="${k}" inputmode="decimal" value="${saved[k] ?? d}" aria-label="${k}">`, c6 = ['', '', '', '', 'n', 'n'];
+    h += row(['', '<b>Subtotal of bills</b>', '', '', '', '<b id="tot">0.00</b>'], c6) + row(['', 'Contingency (%)', '', '', pc('cPct', ''), '<span id="cV">0.00</span>'], c6) +
+      row(['', 'Overhead and profit (%)', '', '', pc('oPct', ''), '<span id="oV">0.00</span>'], c6) + row(['', 'VAT (%)', '', '', pc('vPct', 7.5), '<span id="vV">0.00</span>'], c6) +
+      row(['', '<b>Grand total</b>', '', '', '', '<b id="grand">0.00</b>'], c6);
+  } else if (tab === 'Materials') {
+    h += head(['Material', 'Unit', 'Qty', 'Price (' + NAIRA + ')', 'Amount (' + NAIRA + ')']) + data.materials.map((m, i) => row([m.d, m.u, f2(m.q), rin(K('p', m.d), '0'), `<span id="a${i}">0.00</span>`], ['', '', 'n', 'n', 'n'])).join('');
+    h += row(['<b>Total</b>', '', '', '', '<b id="tot">0.00</b>'], ['', '', '', '', 'n']);
+  } else {
+    h = `<div class="p-3 flex items-center gap-3 text-sm"><label>Daily rate per worker (${NAIRA}) ${rin('day', '0')}</label></div><table class="w-full text-sm">` +
+      head(['Activity', 'Qty', 'Unit', 'md per unit', 'Man-days', 'Cost (' + NAIRA + ')']) + grouped(6).replace(/\u0000(\d+)\u0000/g, (_, i) => { const x = data.items[i]; return row([x.d, f2(x.q), x.u, `<input data-k="${K('l', x.d)}" inputmode="decimal" value="${saved[K('l', x.d)] ?? x.l}" aria-label="man-days per unit">`, `<span id="d${i}">0.00</span>`, `<span id="a${i}">0.00</span>`], ['', 'n', '', 'n', 'n', 'n']); });
+    h += row(['<b>Total</b>', '', '', '', '<b id="td">0.00</b>', '<b id="tot">0.00</b>'], ['', '', '', '', 'n', 'n']);
+  }
+  $('out').innerHTML = nt + h + '</table>';
+  upd();
+}
+
+function upd() {
+  if (!data) return;
+  let tot = 0, tdays = 0;
+  if (tab === 'BOQ') {
+    data.items.forEach((x, i) => { const a = x.q * num(saved[K('r', x.d)]); tot += a; $('a' + i).textContent = f2(a); });
+    const c = tot * num(saved.cPct) / 100, o = (tot + c) * num(saved.oPct) / 100, v = (tot + c + o) * num(saved.vPct ?? 7.5) / 100;
+    $('cV').textContent = f2(c); $('oV').textContent = f2(o); $('vV').textContent = f2(v); $('grand').textContent = f2(tot + c + o + v);
+  }
+  if (tab === 'Materials') data.materials.forEach((m, i) => { const a = m.q * num(saved[K('p', m.d)]); tot += a; $('a' + i).textContent = f2(a); });
+  if (tab === 'Labour') data.items.forEach((x, i) => { const md = x.q * num(saved[K('l', x.d)] ?? x.l); tdays += md; const a = md * num(saved.day); tot += a; $('d' + i).textContent = f2(md); $('a' + i).textContent = f2(a); });
+  if ($('tot')) $('tot').textContent = f2(tot);
+  if ($('td')) $('td').textContent = f2(tdays);
+}
+$('out').addEventListener('input', (e) => { if (e.target.dataset.k) { saved[e.target.dataset.k] = e.target.value; keep(); upd(); } });
+function csv() {
+  const rows = [...document.querySelectorAll('#out table tr')].map(tr => [...tr.children].map(c => '"' + (c.querySelector('input') ? c.querySelector('input').value : c.textContent).replace(/"/g, '""').trim() + '"').join(','));
+  rows.unshift('"' + (co().coName || '') + '"', '"' + ($('proj').value || '') + '"', '');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + rows.join('\n')], { type: 'text/csv' }));
+  a.download = ($('proj').value || 'quantipro') + '-' + tab.toLowerCase() + '.csv'; a.click();
+}
+// PDF measuring: set a scale, then trace lengths and areas
+let pm = 'scale', pts = [], pscale = 0, pres = [];
+const cv = $('pcv'), ovl = $('pov');
+$('pdf').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  if (!window.pdfjsLib) { $('pmsg').textContent = 'The PDF viewer did not load. Check your connection and reload.'; return; }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const doc = await pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise, pg = await doc.getPage(1), vp = pg.getViewport({ scale: 1.6 });
+  cv.width = ovl.width = vp.width; cv.height = ovl.height = vp.height;
+  await pg.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+  pts = []; pscale = 0; pres = []; pr(); pm = 'scale';
+  $('pmsg').textContent = 'Set the scale first: tap two points a known distance apart, then choose Finish.';
+};
+document.querySelectorAll('[data-m]').forEach(b => b.onclick = () => { pm = b.dataset.m; pts = []; pd(); $('pmsg').textContent = pm === 'scale' ? 'Tap the two ends of a known distance, then Finish.' : 'Tap each corner or end point in order, then Finish.'; });
+ovl.onclick = (e) => { const r = ovl.getBoundingClientRect(); pts.push([(e.clientX - r.left) * ovl.width / r.width, (e.clientY - r.top) * ovl.height / r.height]); pd(); };
+$('undo').onclick = () => { pts.pop(); pd(); };
+function pd() {
+  const g = ovl.getContext('2d'); g.clearRect(0, 0, ovl.width, ovl.height); g.strokeStyle = g.fillStyle = '#e8590c'; g.lineWidth = 2; g.beginPath();
+  pts.forEach(([x, y], k) => k ? g.lineTo(x, y) : g.moveTo(x, y)); if (pm === 'area' && pts.length > 2) g.closePath(); g.stroke();
+  pts.forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); });
+}
+const seg = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+$('fin').onclick = () => {
+  if (pts.length < 2) return;
+  if (pm === 'scale') { const d = parseFloat(prompt('Real distance between the two points, in metres?')); if (d > 0) { pscale = d / seg(pts[0], pts[1]); $('pmsg').textContent = 'Scale set. Now measure lengths or areas.'; } }
+  else if (!pscale) $('pmsg').textContent = 'Set the scale first.';
+  else if (pm === 'len') pres.push({ n: 'Length', v: pts.slice(1).reduce((s, p, k) => s + seg(p, pts[k]), 0) * pscale, u: 'm' });
+  else { let a = 0; pts.forEach((p, k) => { const q = pts[(k + 1) % pts.length]; a += p[0] * q[1] - q[0] * p[1]; }); pres.push({ n: 'Area', v: Math.abs(a / 2) * pscale * pscale, u: 'm²' }); }
+  pts = []; pd(); pr();
+};
+function pr() {
+  $('pout').innerHTML = pres.map((r, k) => `<div class="flex flex-wrap items-center gap-2 py-1"><b>${r.n} ${f2(r.v)} ${r.u}</b><select id="pu${k}" class="border p-1 bg-white"><option value="wallLen">Wall length</option><option value="planL">Plan length</option><option value="planW">Plan width</option><option value="rwLen">Retaining wall length</option></select><button class="tab" onclick="$($('pu${k}').value).value = pres[${k}].v.toFixed(3)">Use this value</button></div>`).join('');
+}
+const K = (c, d) => c + ':' + encodeURIComponent(d);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const wa = (t) => 'https://wa.me/' + SITE.whatsapp + '?text=' + encodeURIComponent(t);
+document.querySelectorAll('[data-site]').forEach(e => e.textContent = SITE[e.dataset.site]);
+document.querySelectorAll('[data-wa]').forEach(a => { a.href = wa(a.dataset.wa.replace('Hello', 'Hello ' + SITE.name)); a.target = '_blank'; a.rel = 'noopener'; });
+const STATS = [['9', 'sections of work to pick from'], ['4', 'foundation types'], ['11', 'numbered bills in the BOQ'], ['1 tap', 'to print or download for Excel']];
+const WHO = [['Students', 'See every working and learn how each quantity is built.'], ['Quantity surveyors', 'Take off faster, then check and price with your own rates.'], ['Builders and contractors', 'Know your blocks, cement, steel and labour before you buy.'], ['Developers and homeowners', 'Get a clear bill to compare quotes against.']];
+const CHIPS = ['Preliminaries', 'Substructure', 'Superstructure frame', 'Masonry and walling', 'Roof works', 'Finishes', 'Doors and windows', 'Electrical and plumbing', 'External works'];
+const SAMPLE = [['Excavate trenches for strip footing', 62.6, 'm³'], ['Strip footing concrete, 1:3:6', 13.7, 'm³'], ['Blockwork above DPC (225 mm)', 250, 'm²'], ['Floor tiles 600 × 600 mm', 120, 'm²'], ['Roofing sheets, fixed', 210, 'm²']];
+$('stats').innerHTML = STATS.map(([n, t]) => `<div class="card"><div class="text-3xl font-bold">${n}</div><div class="text-sm text-slate-600">${t}</div></div>`).join('');
+$('who').innerHTML = WHO.map(([t, d]) => `<div class="card"><h3 class="font-semibold">${t}</h3><p class="text-sm text-slate-700 mt-1">${d}</p></div>`).join('');
+$('chips').innerHTML = CHIPS.map(c => `<span class="tab">${c}</span>`).join('');
+$('sample').innerHTML = `<h3 class="font-semibold mb-2">Example output</h3><table class="w-full text-sm">${SAMPLE.map(([d, q, u]) => `<tr><td>${d}${u === 'm²' && /^Blockwork/.test(d) ? `<br><span class="text-xs text-slate-600">${Math.ceil(q / (.45 * .225) * 1.05).toLocaleString('en-NG')} blocks (5% waste)</span>` : ''}</td><td class="n">${f2(q)} ${u}</td></tr>`).join('')}</table><p class="text-xs text-slate-600 mt-2">Illustrative figures. Your takeoff comes from your own dimensions.</p>`;
+$('feat').innerHTML = FEATURES.map(([t, d]) => `<div class="card"><h3 class="font-semibold">${t}</h3><p class="text-sm text-slate-700 mt-1">${d}</p></div>`).join('');
+$('steps').innerHTML = STEPS.map(([t, d]) => `<li class="card"><h3 class="font-semibold">${t}</h3><p class="text-sm text-slate-700 mt-1">${d}</p></li>`).join('');
+$('plans').innerHTML = PLANS.map(p => `<div class="card flex flex-col"><h3 class="font-semibold">${p.n}</h3><p class="text-2xl font-bold mt-1">${p.p}</p><p class="text-sm text-slate-600">${p.per}</p><ul class="text-sm mt-3 space-y-1 flex-1 list-disc pl-5">${p.f.map(x => `<li>${x}</li>`).join('')}</ul><a class="go ${p.href ? '' : 'wa'} mt-4 text-center" ${p.href ? `href="${p.href}"` : `data-wa="Hello, I would like the ${p.n} plan."`}>${p.cta}</a></div>`).join('');
+$('faq').innerHTML = FAQ.map(([q, a]) => `<details class="card"><summary>${q}</summary><p class="mt-2 text-sm">${a}</p></details>`).join('');
+$('learn').innerHTML = LEARN.map(([q, a]) => `<details class="card"><summary>${q}</summary><div class="mt-2 text-sm">${a}</div></details>`).join('');
+document.querySelectorAll('#plans [data-wa]').forEach(a => { a.href = wa(a.dataset.wa.replace('Hello', 'Hello ' + SITE.name)); a.target = '_blank'; a.rel = 'noopener'; });
+$('nav').innerHTML = PAGES.filter(p => p[0] !== 'legal' && p[0] !== 'login').map(([k, l]) => `<a href="#${k}">${l}</a>`).join('');
+$('cSend').onclick = () => window.open(wa(`Hello ${SITE.name}, my name is ${$('cName').value || '(no name)'}. Topic: ${$('cTopic').value}. ${$('cMsg').value}`), '_blank');
+
+// Company details for printouts
+const co = () => saved.co || {};
+const setCo = (k, v) => { saved.co = { ...co(), [k]: v }; keep(); renderPH(); };
+const coIds = ['coName', 'coPhone', 'coEmail', 'coAddr'];
+coIds.forEach(id => { $(id).value = co()[id] || ''; $(id).oninput = () => setCo(id, $(id).value); });
+$('coLogo').onchange = (e) => {
+  const f = e.target.files[0]; if (!f) return; const img = new Image();
+  img.onload = () => { const s = Math.min(1, 260 / img.width, 110 / img.height), c = document.createElement('canvas'); c.width = img.width * s; c.height = img.height * s; c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); setCo('logo', c.toDataURL('image/png')); };
+  img.src = URL.createObjectURL(f);
+};
+$('coClear').onclick = () => { saved.co = {}; keep(); coIds.forEach(id => { $(id).value = ''; }); renderPH(); };
+function renderPH() {
+  const c = co(), t = `${c.logo ? `<img src="${c.logo}" alt="Company logo" style="max-height:60px;max-width:180px">` : ''}<div><div class="text-lg font-bold">${esc(c.coName || '')}</div><div class="text-xs">${[c.coPhone, c.coEmail, c.coAddr].filter(Boolean).map(esc).join(' · ')}</div></div><div class="ml-auto text-xs text-right">${esc($('proj').value || '')}<br>${new Date().toLocaleDateString('en-NG')}</div>`;
+  $('ph').innerHTML = t; $('copv').innerHTML = t;
+}
+$('proj').addEventListener('input', renderPH); renderPH();
+
+// Saved rates page
+function renderRates() {
+  const ks = Object.keys(saved).filter(k => /^[rp]:/.test(k) && saved[k] !== '');
+  $('ratesBody').innerHTML = ks.length ? ks.map(k => `<tr><td>${k[0] === 'r' ? 'BOQ' : 'Material'}</td><td>${esc(decodeURIComponent(k.slice(2)))}</td><td class="n"><input data-rk="${k}" inputmode="decimal" value="${esc(saved[k])}" style="width:7rem;text-align:right"></td><td><button class="tab" data-del="${k}">Remove</button></td></tr>`).join('') : '<tr><td colspan="4">No rates saved yet. Enter rates in the BOQ or Materials tab and they appear here.</td></tr>';
+}
+$('ratesBody').addEventListener('input', (e) => { if (e.target.dataset.rk) { saved[e.target.dataset.rk] = e.target.value; keep(); } });
+$('ratesBody').addEventListener('click', (e) => { if (e.target.dataset.del) { delete saved[e.target.dataset.del]; keep(); renderRates(); } });
+
+// Page routing
+function route() {
+  const p = location.hash.slice(1), ok = PAGES.some(x => x[0] === p) ? p : 'home';
+  if (AUTH.auth && (ok === 'takeoff' || ok === 'rates') && !sess()) { sessionStorage.setItem('qp_next', ok); lgMode = 'login'; lgDraw(); $('lgInfo').textContent = 'Log in or create a free account to use the takeoff, BOQ and schedules.'; location.hash = '#login'; return; }
+  document.querySelectorAll('main[data-page]').forEach(m => { m.hidden = m.dataset.page !== ok; });
+  document.querySelectorAll('#nav a').forEach(a => a.removeAttribute('aria-current')); const cur = document.querySelector(`#nav a[href="#${ok}"]`); if (cur) cur.setAttribute('aria-current', 'page');
+  if (ok === 'rates') renderRates(); if (ok === 'takeoff') render();
+  document.title = PAGES.find(x => x[0] === ok)[1] + ' | ' + SITE.name; window.scrollTo(0, 0);
+}
+// ---- Login (accounts are handled by Supabase, called straight from the browser)
+let AUTH = { auth: false }, lgMode = 'login', resetToken = '';
+const sess = () => { try { return JSON.parse(localStorage.getItem('qp_auth') || 'null'); } catch (e) { return null; } };
+const setSess = (s) => { try { s ? localStorage.setItem('qp_auth', JSON.stringify(s)) : localStorage.removeItem('qp_auth'); } catch (e) {} renderAcct(); };
+const ga = async (path, body, bearer, method = 'POST') => {
+  const r = await fetch(AUTH.url + '/auth/v1/' + path, { method, headers: { 'Content-Type': 'application/json', apikey: AUTH.key, ...(bearer ? { Authorization: 'Bearer ' + bearer } : {}) }, body: JSON.stringify(body) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.msg || d.error_description || d.message || 'Something went wrong. Please try again.');
+  return d;
+};
+const keepSess = (d) => setSess({ at: d.access_token, rt: d.refresh_token, exp: Date.now() + (d.expires_in || 3600) * 1000, email: (d.user && d.user.email) || (sess() || {}).email || '' });
+async function token() {
+  const s = sess(); if (!s) return null;
+  if (s.exp - Date.now() > 60000) return s.at;
+  try { const d = await ga('token?grant_type=refresh_token', { refresh_token: s.rt }); keepSess(d); return d.access_token; } catch (e) { setSess(null); return null; }
+}
+function renderAcct() {
+  const s = sess();
+  $('acct').innerHTML = !AUTH.auth ? '' : s ? `<span class="hidden sm:inline text-slate-600">${esc(s.email || '')}</span><button class="tab" id="lo">Log out</button>` : '<a class="tab" href="#login">Log in</a>';
+  if ($('lo')) $('lo').onclick = () => { setSess(null); location.hash = '#home'; };
+}
+const LG = { login: ['Log in', 'Log in'], signup: ['Create your free account', 'Create account'], reset: ['Reset your password', 'Send reset link'], newpass: ['Choose a new password', 'Save password'] };
+function lgDraw() {
+  $('lgTitle').textContent = LG[lgMode][0]; $('lgGo').textContent = LG[lgMode][1];
+  $('lgEmail').parentElement.hidden = lgMode === 'newpass'; $('lgPass').parentElement.hidden = lgMode === 'reset' || lgMode === 'newpass'; $('lgNewWrap').hidden = lgMode !== 'newpass';
+  $('lgSwap').textContent = lgMode === 'signup' ? 'I already have an account' : 'Create an account'; $('lgMsg').textContent = '';
+  if (!AUTH.auth) $('lgInfo').textContent = 'Login is not switched on for this site yet.';
+}
+const toNext = () => { const n = sessionStorage.getItem('qp_next') || 'takeoff'; sessionStorage.removeItem('qp_next'); location.hash = '#' + n; };
+$('lgSwap').onclick = () => { lgMode = lgMode === 'signup' ? 'login' : 'signup'; lgDraw(); };
+$('lgForgot').onclick = () => { lgMode = 'reset'; lgDraw(); };
+$('lgGo').onclick = async () => {
+  const m = $('lgMsg'), email = $('lgEmail').value.trim(), pw = $('lgPass').value; m.className = 'text-red-700'; m.textContent = '';
+  try {
+    if (lgMode === 'login') { keepSess(await ga('token?grant_type=password', { email, password: pw })); toNext(); }
+    else if (lgMode === 'signup') { const d = await ga('signup', { email, password: pw }); if (d.access_token) { keepSess(d); toNext(); } else { m.className = 'text-green-800'; m.textContent = 'Account created. Open the confirmation link we emailed you, then log in.'; } }
+    else if (lgMode === 'reset') { await ga('recover', { email }); m.className = 'text-green-800'; m.textContent = 'If that email has an account, a reset link is on its way.'; }
+    else { await ga('user', { password: $('lgNew').value }, resetToken, 'PUT'); m.className = 'text-green-800'; m.textContent = 'Password saved. You can log in now.'; resetToken = ''; setTimeout(() => { lgMode = 'login'; lgDraw(); }, 1500); }
+  } catch (e) { m.textContent = e.message; }
+};
+function handleAuthHash() {
+  if (!/access_token=/.test(location.hash)) return;
+  const q = new URLSearchParams(location.hash.slice(1)), at = q.get('access_token');
+  history.replaceState(null, '', location.pathname);
+  if (q.get('type') === 'recovery') { resetToken = at; lgMode = 'newpass'; lgDraw(); location.hash = '#login'; }
+  else { keepSess({ access_token: at, refresh_token: q.get('refresh_token'), expires_in: +q.get('expires_in') || 3600 }); location.hash = '#takeoff'; }
+}
+function initAuth() {
+  fetch(API + '/api/config').then(r => r.json()).then(c => { AUTH = c; }).catch(() => {}).finally(() => { handleAuthHash(); renderAcct(); lgDraw(); route(); });
+}
+$('yr').textContent = new Date().getFullYear();
+window.addEventListener('hashchange', route); initAuth();
+render();
+</script>
+</body>
+</html>
